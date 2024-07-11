@@ -30,9 +30,8 @@ using namespace clang;
 using namespace CodeGen;
 
 CodeGenTypes::CodeGenTypes(CodeGenModule &cgm)
-  : CGM(cgm), Context(cgm.getContext()), TheModule(cgm.getModule()),
-    Target(cgm.getTarget()), TheCXXABI(cgm.getCXXABI()),
-    TheABIInfo(cgm.getTargetCodeGenInfo().getABIInfo()) {
+    : CGM(cgm), Context(cgm.getContext()), TheModule(cgm.getModule()),
+      Target(cgm.getTarget()) {
   SkippedLayout = false;
   LongDoubleReferenced = false;
 }
@@ -42,6 +41,12 @@ CodeGenTypes::~CodeGenTypes() {
        I = FunctionInfos.begin(), E = FunctionInfos.end(); I != E; )
     delete &*I++;
 }
+
+const ABIInfo &CodeGenTypes::getABIInfo() const {
+  return getCGM().getTargetCodeGenInfo().getABIInfo();
+}
+
+CGCXXABI &CodeGenTypes::getCXXABI() const { return getCGM().getCXXABI(); }
 
 const CodeGenOptions &CodeGenTypes::getCodeGenOpts() const {
   return CGM.getCodeGenOpts();
@@ -533,6 +538,11 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
       llvm_unreachable("Unexpected wasm reference builtin type!");             \
   } break;
 #include "clang/Basic/WebAssemblyReferenceTypes.def"
+#define AMDGPU_OPAQUE_PTR_TYPE(Name, MangledName, AS, Width, Align, Id,        \
+                               SingletonId)                                    \
+  case BuiltinType::Id:                                                        \
+    return llvm::PointerType::get(getLLVMContext(), AS);
+#include "clang/Basic/AMDGPUTypes.def"
     case BuiltinType::Dependent:
 #define BUILTIN_TYPE(Id, SingletonId)
 #define PLACEHOLDER_TYPE(Id, SingletonId) \
