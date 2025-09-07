@@ -14,16 +14,12 @@
 namespace llvm {
 namespace orc {
 
-ThreadSafeModule cloneToContext(const Module &M,
-                                ThreadSafeContext TSCtx,
-                                GVPredicate ShouldCloneDef,
-                                GVModifier UpdateClonedDefSource) {
-  if (!ShouldCloneDef)
-    ShouldCloneDef = [](const GlobalValue &) { return true; };
-
-  // First copy the source module into a buffer.
+static std::pair<std::string, SmallVector<char, 1>>
+serializeModule(const Module &M, GVPredicate ShouldCloneDef,
+                GVModifier UpdateClonedDefSource) {
   std::string ModuleName;
   SmallVector<char, 1> ClonedModuleBuffer;
+
   ModuleName = M.getModuleIdentifier();
   std::set<GlobalValue *> ClonedDefsInSrc;
   ValueToValueMapTy VMap;
@@ -44,19 +40,41 @@ ThreadSafeModule cloneToContext(const Module &M,
   BCWriter.writeSymtab();
   BCWriter.writeStrtab();
 
+  return {std::move(ModuleName), std::move(ClonedModuleBuffer)};
+}
+
+ThreadSafeModule
+deserializeModule(std::string ModuleName,
+                  const SmallVector<char, 1> &ClonedModuleBuffer,
+                  ThreadSafeContext TSCtx) {
   MemoryBufferRef ClonedModuleBufferRef(
       StringRef(ClonedModuleBuffer.data(), ClonedModuleBuffer.size()),
       "cloned module buffer");
 
   // Then parse the buffer into the new Module.
-  auto R = TSCtx.withContextDo([&](LLVMContext *Ctx) {
+  auto M = TSCtx.withContextDo([&](LLVMContext *Ctx) {
     assert(Ctx && "No LLVMContext provided");
     auto TmpM = cantFail(parseBitcodeFile(ClonedModuleBufferRef, *Ctx));
     TmpM->setModuleIdentifier(ModuleName);
     return TmpM;
   });
 
-  return ThreadSafeModule(std::move(R), std::move(TSCtx));
+  return ThreadSafeModule(std::move(M), std::move(TSCtx));
+}
+
+ThreadSafeModule
+cloneExternalModuleToContext(const Module &M, ThreadSafeContext TSCtx,
+                             GVPredicate ShouldCloneDef,
+                             GVModifier UpdateClonedDefSource) {
+
+  if (!ShouldCloneDef)
+    ShouldCloneDef = [](const GlobalValue &) { return true; };
+
+  auto [ModuleName, ClonedModuleBuffer] = serializeModule(
+      M, std::move(ShouldCloneDef), std::move(UpdateClonedDefSource));
+
+  return deserializeModule(std::move(ModuleName), ClonedModuleBuffer,
+                           std::move(TSCtx));
 }
 
 ThreadSafeModule cloneToContext(const ThreadSafeModule &TSM,
@@ -65,11 +83,17 @@ ThreadSafeModule cloneToContext(const ThreadSafeModule &TSM,
                                 GVModifier UpdateClonedDefSource) {
   assert(TSM && "Can not clone null module");
 
-  ThreadSafeModule R;
-  TSM.withModuleDo([&](Module &M) {
-    R = cloneToContext(M, TSCtx, ShouldCloneDef, UpdateClonedDefSource);
+  if (!ShouldCloneDef)
+    ShouldCloneDef = [](const GlobalValue &) { return true; };
+
+  // First copy the source module into a buffer.
+  auto [ModuleName, ClonedModuleBuffer] = TSM.withModuleDo([&](Module &M) {
+    return serializeModule(M, std::move(ShouldCloneDef),
+                           std::move(UpdateClonedDefSource));
   });
-  return R;
+
+  return deserializeModule(std::move(ModuleName), ClonedModuleBuffer,
+                           std::move(TSCtx));
 }
 
 ThreadSafeModule cloneToNewContext(const ThreadSafeModule &TSM,
