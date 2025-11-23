@@ -1832,6 +1832,13 @@ public:
     return TrapReasonBuilder(&getDiags(), DiagID, TR);
   }
 
+  void EmitGlobalVarDefinition(const VarDecl *D, bool IsTentative = false);
+
+public:
+  /// Ensure a static data member with an in-class initializer is materialized
+  /// and return the declaration that owns the emitted definition.
+  const VarDecl *materializeStaticDataMember(const VarDecl *VD);
+
 private:
   bool shouldDropDLLAttribute(const Decl *D, const llvm::GlobalValue *GV) const;
 
@@ -1882,7 +1889,6 @@ private:
   void EmitGlobalFunctionDefinition(GlobalDecl GD, llvm::GlobalValue *GV);
   void EmitMultiVersionFunctionDefinition(GlobalDecl GD, llvm::GlobalValue *GV);
 
-  void EmitGlobalVarDefinition(const VarDecl *D, bool IsTentative = false);
   void EmitAliasDefinition(GlobalDecl GD);
   void emitIFuncDefinition(GlobalDecl GD);
   void emitCPUDispatchDefinition(GlobalDecl GD);
