@@ -828,9 +828,16 @@ Error LLJITBuilderState::prepareForConstruction() {
       if (!JTMB->getCodeModel())
         JTMB->setCodeModel(CodeModel::Small);
       JTMB->setRelocationModel(Reloc::PIC_);
+      bool IsOSBinFormatCOFF = TT.isOSBinFormatCOFF();
       CreateObjectLinkingLayer =
           [](ExecutionSession &ES) -> Expected<std::unique_ptr<ObjectLayer>> {
-        return std::make_unique<ObjectLinkingLayer>(ES);
+        auto ObjLinkingLayer = std::make_unique<ObjectLinkingLayer>(ES);
+        if (IsOSBinFormatCOFF) {
+          // COFF doesn't track symbol visibility, use IR flags as
+          // authoritative, matching RTDyld COFF behavior.
+          ObjectLayer->setOverrideObjectFlagsWithResponsibilityFlags(true);
+        }
+        return std::move(ObjLinkingLayer);
       };
     }
   }
