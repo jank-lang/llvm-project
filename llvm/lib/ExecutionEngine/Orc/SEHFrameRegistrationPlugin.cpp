@@ -100,7 +100,10 @@ void SEHFrameRegistrationPlugin::modifyPassConfig(
 Error SEHFrameRegistrationPlugin::registerFrameInfo(jitlink::LinkGraph &G) {
   using namespace shared;
 
-  auto *ImageBase = jitlink::GetImageBaseSymbol()(G);
+  auto IBN = G.intern("__ImageBase");
+  auto *ImageBase = G.findExternalSymbolByName(IBN);
+  if (!ImageBase)
+    ImageBase = G.findAbsoluteSymbolByName(IBN);
   if (!ImageBase)
     return Error::success();
 

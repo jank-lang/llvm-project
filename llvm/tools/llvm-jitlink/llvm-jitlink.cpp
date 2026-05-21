@@ -1334,7 +1334,7 @@ Session::Session(std::unique_ptr<ExecutorProcessControl> EPC, Error &Err)
     }
   } else if (TT.isOSBinFormatCOFF()) {
     if (!NoExec)
-      ObjLayer->addPlugin(std::make_unique<SEHFrameRegistrationPlugin>());
+      ObjLayer.addPlugin(std::make_unique<SEHFrameRegistrationPlugin>());
   }
 
   if (auto MainJDOrErr = ES.createJITDylib("main"))

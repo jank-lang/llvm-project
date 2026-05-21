@@ -862,12 +862,12 @@ Error LLJITBuilderState::prepareForConstruction() {
       JTMB->setRelocationModel(Reloc::PIC_);
       bool IsOSBinFormatCOFF = TT.isOSBinFormatCOFF();
       CreateObjectLinkingLayer =
-          [](ExecutionSession &ES) -> Expected<std::unique_ptr<ObjectLayer>> {
+          [IsOSBinFormatCOFF](ExecutionSession &ES) -> Expected<std::unique_ptr<ObjectLayer>> {
         auto ObjLinkingLayer = std::make_unique<ObjectLinkingLayer>(ES);
         if (IsOSBinFormatCOFF) {
           // COFF doesn't track symbol visibility, use IR flags as
           // authoritative, matching RTDyld COFF behavior.
-          ObjectLayer->setOverrideObjectFlagsWithResponsibilityFlags(true);
+          ObjLinkingLayer->setOverrideObjectFlagsWithResponsibilityFlags(true);
         }
         return std::move(ObjLinkingLayer);
       };
