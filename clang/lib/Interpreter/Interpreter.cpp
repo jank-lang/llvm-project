@@ -264,7 +264,13 @@ Interpreter::Interpreter(std::unique_ptr<CompilerInstance> Instance,
 
   if (ErrOut)
     return;
-  CI->ExecuteAction(*Act);
+  if (!CI->ExecuteAction(*Act) || CI->getDiagnostics().hasErrorOccurred()) {
+    ErrOut = joinErrors(
+        std::move(ErrOut),
+        llvm::createStringError(llvm::errc::not_supported,
+                                "Failed to execute incremental action"));
+    return;
+  }
 
   IncrParser =
       std::make_unique<IncrementalParser>(*CI, Act.get(), ErrOut, PTUs);
